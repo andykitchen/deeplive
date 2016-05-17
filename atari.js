@@ -3,6 +3,24 @@ Module = {};
 
 (function(Module, ALE) {
 
+var net = new convnetjs.Net();
+net.fromJSON(pretrained_net_json);
+
+function argmax(arr) {
+	var k = undefined
+	var x = Number.NEGATIVE_INFINITY
+	var len = arr.length
+	for(var i = 0; i < len; i++) {
+		var val = arr[i]
+		if(val > x) {
+			x = val
+			k = i
+		}
+	}
+
+	return k
+}
+
 function wrap_ale(Module, ALE) {
 	ALE.ALE_new = Module.cwrap('ALE_new', null, [])
 	ALE.loadROM =  Module.cwrap('loadROM', null, ['number', 'string'])
@@ -64,6 +82,8 @@ function onRuntimeInitialized() {
 	console.log(ALE.getScreenWidth(ale))
 	console.log(ALE.getMinimalActionSet(ale))
 
+	var action_set = ALE.getMinimalActionSet(ale)
+
 	var canvas = document.getElementById("canvas")
 	var ctx = canvas.getContext("2d")
 
@@ -97,8 +117,7 @@ function onRuntimeInitialized() {
 
 	var data = imageData.data
 
-	var input = new Float32Array(84*84*4)
-	window.input = input
+	var vol = new convnetjs.Vol(84, 84, 4)
 
 	var rotate_screens = function() {
 		for(var i = 0; i < 3; i++) {
@@ -107,8 +126,27 @@ function onRuntimeInitialized() {
 	}
 
 	var draw = function() {
-		rotate_screens();
-		ALE.act(ale, 1);
+		var w = vol.w;
+		for(var k = 0; k < 4; k++) {
+			var imageData_small = ctx_out[k].getImageData(0, 0, 84, 84)
+			var small_data = imageData_small.data
+			for(var i = 0; i < screen_len; i++) {
+				w[4*i + k] = small_data[4*i]
+			}
+		}
+
+		var res = net.forward(vol)
+		var action_index = argmax(res.w)
+		var action = action_set[action_index]
+
+		var r = Math.random()
+		if(r < 0.05) {
+			action = action_set[Math.floor(Math.random()*action_set.length)]
+		}
+
+		ALE.act(ale, action)
+
+		rotate_screens()
 
 		ALE._getScreenGrayscale(ale, screen_ptr)
 		ALE.util.gray2rgba(screen_len, screen_ptr, buf8_ptr)
@@ -121,16 +159,8 @@ function onRuntimeInitialized() {
 		ALE._getScreenRGB(ale, screen_rgb_ptr)
 		ALE.util.rgb2rgba(screen_len, screen_rgb_ptr, buf8_ptr)
 		var rgba = Module.HEAPU8.subarray(buf8_ptr, buf8_ptr + imageData.data.length)
-		imageData.data.set(rgba);
-		ctx_rgb.putImageData(imageData, 0, 0);
-
-		for(var k = 0; k < 4; k++) {
-			var imageData_small = ctx_out[k].getImageData(0, 0, 84, 84)
-			var small_data = imageData_small.data
-			for(var i = 0; i < screen_len; i++) {
-				input[84*84*k + i] = small_data[4*i]
-			}
-		}
+		imageData.data.set(rgba)
+		ctx_rgb.putImageData(imageData, 0, 0)
 	}
 
 	var redraw = function() {
