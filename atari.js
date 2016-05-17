@@ -4,7 +4,7 @@ Module = {};
 (function(Module, ALE) {
 
 var net = new convnetjs.Net();
-net.fromJSON(pretrained_net_json);
+net.fromJSON(net_json);
 
 function argmax(arr) {
 	var k = undefined
@@ -120,8 +120,8 @@ function onRuntimeInitialized() {
 	var vol = new convnetjs.Vol(84, 84, 4)
 
 	var rotate_screens = function() {
-		for(var i = 0; i < 3; i++) {
-			ctx_out[i+1].drawImage(canvas_out[i], 0, 0)
+		for(var i = 3; i > 0; i--) {
+			ctx_out[i-1].drawImage(canvas_out[i], 0, 0)
 		}
 	}
 
@@ -131,7 +131,7 @@ function onRuntimeInitialized() {
 			var imageData_small = ctx_out[k].getImageData(0, 0, 84, 84)
 			var small_data = imageData_small.data
 			for(var i = 0; i < screen_len; i++) {
-				w[4*i + k] = small_data[4*i]
+				w[4*i + k] = small_data[4*i] / 255.0
 			}
 		}
 
@@ -140,10 +140,9 @@ function onRuntimeInitialized() {
 		var action = action_set[action_index]
 
 		var r = Math.random()
-		if(r < 0.05) {
+		if(r < 0.1) {
 			action = action_set[Math.floor(Math.random()*action_set.length)]
 		}
-
 		ALE.act(ale, action)
 
 		rotate_screens()
@@ -154,7 +153,7 @@ function onRuntimeInitialized() {
 		imageData.data.set(rgba);
 
 		ctx.putImageData(imageData, 0, 0);
-		ctx_out[0].drawImage(canvas, 0, 0, 160, 210, 0, -18, 84, 110)
+		ctx_out[3].drawImage(canvas, 0, 0, 160, 210, 0, -18, 84, 110)
 
 		ALE._getScreenRGB(ale, screen_rgb_ptr)
 		ALE.util.rgb2rgba(screen_len, screen_rgb_ptr, buf8_ptr)
