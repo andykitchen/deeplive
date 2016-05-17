@@ -46,13 +46,16 @@ function wrap_ale(Module, ALE) {
 
 	ALE.act = Module.cwrap('act', 'number', ['number', 'number'])
 
+	ALE.util = {}
+
+	ALE.util.gray2rgba = Module.cwrap('gray2rgba', null, ['number', 'number', 'number'])
+	ALE.util.rgb2rgba  = Module.cwrap('rgb2rgba',  null, ['number', 'number', 'number'])
+
 	return ALE
 }
 
 function onRuntimeInitialized() {
 	wrap_ale(Module, ALE)
-	var gray2rgba = Module.cwrap('gray2rgba', null, ['number', 'number', 'number'])
-	var rgb2rgba  = Module.cwrap('rgb2rgba',  null, ['number', 'number', 'number'])
 
 	var ale = ALE.ALE_new();
 	ALE.loadROM(ale, 'space_invaders.bin')
@@ -64,8 +67,14 @@ function onRuntimeInitialized() {
 	var canvas = document.getElementById("canvas")
 	var ctx = canvas.getContext("2d")
 
-	var canvas_small = document.getElementById("canvas-small")
-	var ctx_small = canvas_small.getContext("2d")
+	var canvas_out = [
+		document.getElementById("canvas-s0"),
+		document.getElementById("canvas-s1"),
+		document.getElementById("canvas-s2"),
+		document.getElementById("canvas-s3")
+	]
+
+	var ctx_out = canvas_out.map(function(canvas) {return canvas.getContext("2d")})
 
 	var canvas_rgb = document.getElementById("canvas-rgb")
 	var ctx_rgb = canvas_rgb.getContext("2d")
@@ -88,30 +97,39 @@ function onRuntimeInitialized() {
 
 	var data = imageData.data
 
-	var input = new Float32Array(84*84)
+	var input = new Float32Array(84*84*4)
 	window.input = input
 
+	var rotate_screens = function() {
+		for(var i = 0; i < 3; i++) {
+			ctx_out[i+1].drawImage(canvas_out[i], 0, 0)
+		}
+	}
+
 	var draw = function() {
+		rotate_screens();
 		ALE.act(ale, 1);
 
 		ALE._getScreenGrayscale(ale, screen_ptr)
-		gray2rgba(screen_len, screen_ptr, buf8_ptr)
+		ALE.util.gray2rgba(screen_len, screen_ptr, buf8_ptr)
 		var rgba = Module.HEAPU8.subarray(buf8_ptr, buf8_ptr + imageData.data.length)
 		imageData.data.set(rgba);
 
 		ctx.putImageData(imageData, 0, 0);
-		ctx_small.drawImage(canvas, 0, 0, 160, 210, 0, -18, 84, 110)
+		ctx_out[0].drawImage(canvas, 0, 0, 160, 210, 0, -18, 84, 110)
 
 		ALE._getScreenRGB(ale, screen_rgb_ptr)
-		rgb2rgba(screen_len, screen_rgb_ptr, buf8_ptr)
+		ALE.util.rgb2rgba(screen_len, screen_rgb_ptr, buf8_ptr)
 		var rgba = Module.HEAPU8.subarray(buf8_ptr, buf8_ptr + imageData.data.length)
 		imageData.data.set(rgba);
 		ctx_rgb.putImageData(imageData, 0, 0);
 
-		var imageData_small = ctx_small.getImageData(0, 0, 84, 84)
-		var small_data = imageData_small.data
-		for(var i = 0; i < screen_len; i++) {
-			input[i] = small_data[4*i]
+		for(var k = 0; k < 4; k++) {
+			var imageData_small = ctx_out[k].getImageData(0, 0, 84, 84)
+			var small_data = imageData_small.data
+			for(var i = 0; i < screen_len; i++) {
+				input[84*84*k + i] = small_data[4*i]
+			}
 		}
 	}
 
