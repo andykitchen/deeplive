@@ -3,8 +3,7 @@ Module = {};
 
 (function(Module, ALE) {
 
-function wrap_ale(Module) {
-	var ALE = {}
+function wrap_ale(Module, ALE) {
 	ALE.ALE_new = Module.cwrap('ALE_new', null, [])
 	ALE.loadROM =  Module.cwrap('loadROM', null, ['number', 'string'])
 
@@ -50,18 +49,8 @@ function wrap_ale(Module) {
 	return ALE
 }
 
-function writeScreen(screen, data) {
-	var data_len = data.length
-	for (var i = 0; i < data_len; i++) {
-		data[4*i]     = screen[i]; // red
-		data[4*i + 1] = screen[i]; // green
-		data[4*i + 2] = screen[i]; // blue
-		data[4*i + 3] = 255;
-	}
-}
-
 function onRuntimeInitialized() {
-	var ALE = wrap_ale(Module)
+	wrap_ale(Module, ALE)
 	var gray2rgba = Module.cwrap('gray2rgba', null, ['number', 'number', 'number'])
 	var rgb2rgba  = Module.cwrap('rgb2rgba',  null, ['number', 'number', 'number'])
 
@@ -104,9 +93,6 @@ function onRuntimeInitialized() {
 
 	var draw = function() {
 		ALE.act(ale, 1);
-
-		// var screen = getScreenGrayscale(ale);
-		// writeScreen(screen, data);
 
 		ALE._getScreenGrayscale(ale, screen_ptr)
 		gray2rgba(screen_len, screen_ptr, buf8_ptr)
